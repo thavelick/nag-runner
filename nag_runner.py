@@ -13,22 +13,6 @@ from subprocess import call
 Entry = namedtuple("Entry", ["name", "command", "interval"])
 
 
-class NagRunnerException(Exception):
-    "Base exception for nag_runner."
-
-
-class InvalidConfigException(NagRunnerException):
-    "Raised when the config is invalid."
-
-
-class InvalidEntryException(NagRunnerException):
-    "Raised when the entry is invalid."
-
-
-class MissingConfigException(NagRunnerException):
-    "Raised when the config is missing."
-
-
 class NagRunner:
     "main class for nag runner."
 
@@ -37,6 +21,11 @@ class NagRunner:
         self.last_run_path = last_run_path or os.path.expanduser(
             "~/.cache/nag_runner/last_run.json"
         )
+
+    def load_json_file(self, path):
+        "Loads a json file from the given path."
+        with open(path, "r", encoding="utf-8") as file:
+            return json.load(file)
 
     def load_config(self, config_file):
         "Loads a list of Entries from the config file."
@@ -50,22 +39,19 @@ class NagRunner:
         )
         for possible_config_file in possible_config_files:
             if os.path.exists(possible_config_file):
-                with open(possible_config_file, "r", encoding="utf-8") as file:
-                    config_data = json.load(file)
-                    return [Entry(**entry_data) for entry_data in config_data]
+                return [
+                    Entry(**entry_data)
+                    for entry_data in self.load_json_file(possible_config_file)
+                ]
 
-        raise MissingConfigException(
-            f"No config file found at {', '.join(possible_config_files)}"
-        )
+        sys.exit(f"No config file found at {', '.join(possible_config_files)}")
 
     def get_last_run(self, name):
         "Returns the last run time for a command."
         if not os.path.exists(self.last_run_path):
             return None
 
-        with open(self.last_run_path, "r", encoding="utf-8") as file:
-            last_run = json.load(file)
-
+        last_run = self.load_json_file(self.last_run_path)
         if name not in last_run:
             return None
 
@@ -76,7 +62,7 @@ class NagRunner:
         for entry in self.config:
             if entry.name == name:
                 return entry
-        raise InvalidEntryException(f"Could not find entry with name {name}")
+        sys.exit(f"Could not find entry with name {name}")
 
     def list_entries_next_run(self):
         "Lists all entries and when they will next run."
@@ -104,8 +90,7 @@ class NagRunner:
         "Don't run the command this time and reset the interval."
         last_run = {}
         if os.path.exists(self.last_run_path):
-            with open(self.last_run_path, "r", encoding="utf-8") as file:
-                last_run = json.load(file)
+            last_run = self.load_json_file(self.last_run_path)
         else:
             os.makedirs(os.path.dirname(self.last_run_path), exist_ok=True)
         last_run[entry.name] = datetime.now().isoformat()
@@ -184,8 +169,4 @@ def main():
 
 
 if __name__ == "__main__":
-    try:
-        main()
-    except NagRunnerException as e:
-        print(e)
-        sys.exit(1)
+    main()
