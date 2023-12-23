@@ -2,11 +2,13 @@
 
 Reminds you to run important commands on a regular basis.
 
+This is useful to use on a system like a laptop that you don't leave running all the time to run things that you might otherwise throw in a cron.
+
 ## Installation and Usage
 
 1. Clone
 ```bash
-git clone https://github.com/thavelick/nag-runner.git && cd nag-runner
+git clone https://github.com/thavelick/nag-runner.git
 ```
 2. Make a config file
 ```bash
@@ -46,8 +48,19 @@ passed.
 * `--list`: List all entries and when they will next run. Will output something like this:
 ```
 archlinux updates: Next run in 6 days
-prune yay cache: Next run in 20 days
-``````
+prune backups: Next run in 2 days
+```
+
+## Tips
+* If you'd like each different commands to run on different days, set each interval to a prime number of days. For instance if you set one command to run every 11 days and another every 13 days, they'll run with roughly the same regularity, but never on the same day.
+* Conversely if I choose intervals that share a lot of common factors, you can tend to batch things together while running them with different frequencies.
+
+### Some ideas on what to run with Nag Runner
+I use this to regularly run scripts that:
+* Update my system's packages
+* Prune caches
+* Run and prune backups
+* Rotate credentials and API keys that expire
 
 ## Dependencies
 * Python 3
