@@ -5,26 +5,12 @@ import argparse
 import json
 import os
 import sys
-from dataclasses import dataclass
+from collections import namedtuple
 from datetime import datetime, timedelta
 from subprocess import call
 
 
-@dataclass
-class Entry:
-    "A single entry in the config file."
-    name: str
-    command: str
-    interval: int
-
-    @classmethod
-    def from_dict(cls, entry_dict):
-        "convert from a dict."
-
-        for key in ["name", "command", "interval"]:
-            if key not in entry_dict:
-                raise InvalidConfigException(f"No {key} specified")
-        return cls(**entry_dict)
+Entry = namedtuple("Entry", ["name", "command", "interval"])
 
 
 class NagRunnerException(Exception):
@@ -48,33 +34,29 @@ class NagRunner:
 
     def __init__(self, config_path, last_run_path=None):
         self.config = self.load_config(config_path)
-        self.last_run_path = last_run_path or self.get_default_last_run_path()
-
-    def load_config(self, config_file=None):
-        "Loads a list of Entries from the config file."
-        config_file = config_file or self.find_config_path()
-        with open(config_file, "r", encoding="utf-8") as file:
-            return [Entry.from_dict(entry) for entry in json.load(file)]
-
-    def find_config_path(self):
-        "Returns the path to the config file."
-        possible_config_files = [
-            os.path.join(os.path.expanduser("~"), ".config", "nag_runner.json"),
-            os.path.join(os.path.expanduser("~"), ".nag_runner.json"),
-        ]
-
-        for config_file in possible_config_files:
-            if os.path.exists(config_file):
-                return config_file
-
-        possible_config_files_string = ", ".join(possible_config_files)
-        raise MissingConfigException(
-            f"No config file found in {possible_config_files_string}"
+        self.last_run_path = last_run_path or os.path.expanduser(
+            "~/.cache/nag_runner/last_run.json"
         )
 
-    def get_default_last_run_path(self):
-        "Returns the default path to the last run file."
-        return os.path.expanduser("~/.cache/nag_runner/last_run.json")
+    def load_config(self, config_file):
+        "Loads a list of Entries from the config file."
+        possible_config_files = (
+            [config_file]
+            if config_file
+            else [
+                os.path.expanduser(path)
+                for path in ["~/.config/nag_runner.json", "~/.nag_runner.json"]
+            ]
+        )
+        for possible_config_file in possible_config_files:
+            if os.path.exists(possible_config_file):
+                with open(possible_config_file, "r", encoding="utf-8") as file:
+                    config_data = json.load(file)
+                    return [Entry(**entry_data) for entry_data in config_data]
+
+        raise MissingConfigException(
+            f"No config file found at {', '.join(possible_config_files)}"
+        )
 
     def get_last_run(self, name):
         "Returns the last run time for a command."
@@ -143,6 +125,7 @@ class NagRunner:
     def get_user_actions(self):
         "Returns a list of actions the user can take."
         return [
+            # (responses, method, ask_again)
             (["y", "Y", ""], self.run_entry, False),
             (["n", "N"], self.print_next_time_message, False),
             (["d"], self.set_last_run, False),
@@ -165,7 +148,7 @@ class NagRunner:
             else:
                 prompt = f"You have never run {entry.name}. Run now? [Y/n/d/?] "
 
-            ask_again = True
+            keep_going = True
             while keep_going:
                 print(prompt, end="")
                 response = input()
