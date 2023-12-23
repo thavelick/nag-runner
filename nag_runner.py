@@ -1,4 +1,6 @@
 #!/usr/bin/python3
+"Nag Runner: Reminds you to run important commands on a regular basis."
+
 import argparse
 import json
 import os
@@ -10,6 +12,7 @@ from subprocess import call
 
 @dataclass
 class Entry:
+    "A single entry in the config file."
     name: str
     command: str
     interval: int
@@ -41,6 +44,8 @@ class MissingConfigException(NagRunnerException):
 
 
 class NagRunner:
+    "main class for nag runner."
+
     def __init__(self, config_path, last_run_path=None):
         self.config = self.load_config(config_path)
         self.last_run_path = last_run_path or self.get_default_last_run_path()
@@ -69,9 +74,7 @@ class NagRunner:
 
     def get_default_last_run_path(self):
         "Returns the default path to the last run file."
-        return os.path.join(
-            os.path.expanduser("~"), ".cache", "nag_runner", "last_run.json"
-        )
+        return os.path.expanduser("~/.cache/nag_runner/last_run.json")
 
     def get_last_run(self, name):
         "Returns the last run time for a command."
@@ -86,24 +89,12 @@ class NagRunner:
 
         return datetime.strptime(last_run[name], "%Y-%m-%dT%H:%M:%S.%f")
 
-    def set_last_run(self, name):
-        "Sets the last run time for a command."
-        last_run = {}
-        if os.path.exists(self.last_run_path):
-            with open(self.last_run_path, "r", encoding="utf-8") as file:
-                last_run = json.load(file)
-        else:
-            os.makedirs(os.path.dirname(self.last_run_path), exist_ok=True)
-        last_run[name] = datetime.now().isoformat()
-        with open(self.last_run_path, "w", encoding="utf-8") as file:
-            json.dump(last_run, file)
-
     def get_entry_by_name(self, name):
         "Returns the entry with the given name."
         for entry in self.config:
             if entry.name == name:
                 return entry
-        return None
+        raise InvalidEntryException(f"Could not find entry with name {name}")
 
     def list_entries_next_run(self):
         "Lists all entries and when they will next run."
@@ -118,30 +109,45 @@ class NagRunner:
             print(f"{entry.name}: Next run in {days_until_next_run} days")
 
     def run_entry(self, entry):
-        "Runs the given entry."
+        "Runs the command and set it's last run date."
         call(entry.command, shell=True)
-        self.set_last_run(entry.name)
+        self.set_last_run(entry)
 
     def run_entry_by_name(self, name):
         "Runs the entry with the given name."
         entry = self.get_entry_by_name(name)
-        if not entry:
-            raise InvalidEntryException(f"Could not find entry with name {name}")
         self.run_entry(entry)
 
-    def print_menu(self):
-        "print the help menu"
+    def set_last_run(self, entry):
+        "Don't run the command this time and reset the interval."
+        last_run = {}
+        if os.path.exists(self.last_run_path):
+            with open(self.last_run_path, "r", encoding="utf-8") as file:
+                last_run = json.load(file)
+        else:
+            os.makedirs(os.path.dirname(self.last_run_path), exist_ok=True)
+        last_run[entry.name] = datetime.now().isoformat()
+        with open(self.last_run_path, "w", encoding="utf-8") as file:
+            json.dump(last_run, file)
 
-        print(
-            """
-        Possible responses are:
-        y: Run the command
-        n: Do not run the command, but still nag me next time
-        d: don't run the command this time and reset the interval. This is useful if
-            you've  run the command outside of nag_runner recently
-        ?: Show this help message
-        """
-        )
+    def print_next_time_message(self, _entry):
+        "Do not run the command, but still nag me next time."
+        print("Ok, I'll nag you next time")
+
+    def print_menu(self, _entry):
+        "Show the help menu"
+        print("Possible responses are:")
+        for responses, method in self.get_user_actions():
+            print(f"{responses[0]}: {method.__doc__}")
+
+    def get_user_actions(self):
+        "Returns a list of actions the user can take."
+        return [
+            (["y", "Y", ""], self.run_entry, False),
+            (["n", "N"], self.print_next_time_message, False),
+            (["d"], self.set_last_run, False),
+            (["?"], self.print_menu, True),
+        ]
 
     def run_overdue_entries(self):
         "Runs all overdue entries."
@@ -154,25 +160,19 @@ class NagRunner:
 
                 prompt = (
                     f"It has been {delta.days} days since you last ran {entry.name}. "
-                    f"Run now? [Y/n/d/?] "
+                    "Run now? [Y/n/d/?] "
                 )
             else:
                 prompt = f"You have never run {entry.name}. Run now? [Y/n/d/?] "
 
-            response = None
-            while not response:
+            ask_again = True
+            while keep_going:
                 print(prompt, end="")
                 response = input()
-                if response == "?":
-                    self.print_menu()
-                    response = None
-
-            if response in ["y", "Y", ""]:
-                self.run_entry(entry)
-            elif response == "d":
-                self.set_last_run(entry.name)
-            else:
-                print("Ok, I'll nag you next time")
+                for responses, method, ask_again in self.get_user_actions():
+                    if response in responses:
+                        method(entry)
+                        keep_going = ask_again
 
 
 def main():
@@ -188,19 +188,16 @@ def main():
         action="store_true",
         help="List all entries and when they will next run",
     )
-
     args = parser.parse_args()
 
     nag_runner = NagRunner(args.config_path, args.last_run_path)
 
     if args.name:
         nag_runner.run_entry_by_name(args.name)
-        return
-    if args.list:
+    elif args.list:
         nag_runner.list_entries_next_run()
-        return
-
-    nag_runner.run_overdue_entries()
+    else:
+        nag_runner.run_overdue_entries()
 
 
 if __name__ == "__main__":
