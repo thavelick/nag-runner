@@ -105,6 +105,18 @@ class NagRunner:
                 return entry
         return None
 
+    def list_entries_next_run(self):
+        "Lists all entries and when they will next run."
+        for entry in self.config:
+            last_run = self.get_last_run(entry.name)
+            if last_run:
+                next_run = last_run + timedelta(days=int(entry.interval))
+                days_until_next_run = (next_run - datetime.now()).days
+            else:
+                days_until_next_run = 0
+
+            print(f"{entry.name}: Next run in {days_until_next_run} days")
+
     def run_entry(self, entry):
         "Runs the given entry."
         call(entry.command, shell=True)
@@ -168,7 +180,15 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--config-path", "-c", help="Path to the config file")
     parser.add_argument("--last-run-path", "-l", help="Path to the last run file")
-    parser.add_argument("--name", "-n", help="Name of a single entry to run")
+
+    group = parser.add_mutually_exclusive_group()
+    group.add_argument("--name", "-n", help="Name of a single entry to run")
+    group.add_argument(
+        "--list",
+        action="store_true",
+        help="List all entries and when they will next run",
+    )
+
     args = parser.parse_args()
 
     nag_runner = NagRunner(args.config_path, args.last_run_path)
@@ -176,6 +196,10 @@ def main():
     if args.name:
         nag_runner.run_entry_by_name(args.name)
         return
+    if args.list:
+        nag_runner.list_entries_next_run()
+        return
+
     nag_runner.run_overdue_entries()
 
 

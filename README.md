@@ -39,6 +39,16 @@ You've never run archlinux updates. Run now? [Y/n/d/?]? ? y
 If you open another terminal you won't see another nag until the interval has
 passed.
 
+## Arguments
+* `--config-path`, `-c`: Path to config file. Defaults to `~/.config/nag_runner.json` or `./nag_runner.json`.
+* `--last-run-path`, `-l`: Path to the last run file.
+* `--name`, `-n`: Name of a single entry to run.
+* `--list`: List all entries and when they will next run. Will output something like this:
+```
+archlinux updates: Next run in 6 days
+prune yay cache: Next run in 20 days
+``````
+
 ## Dependencies
 * Python 3
 
