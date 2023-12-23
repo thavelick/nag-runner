@@ -22,8 +22,11 @@ class NagRunner:
             "~/.cache/nag_runner/last_run.json"
         )
 
-    def load_json_file(self, path):
+    def load_json_file(self, path, default):
         "Loads a json file from the given path."
+        if not os.path.exists(path):
+            return default
+
         with open(path, "r", encoding="utf-8") as file:
             return json.load(file)
 
@@ -38,20 +41,15 @@ class NagRunner:
             ]
         )
         for possible_config_file in possible_config_files:
-            if os.path.exists(possible_config_file):
-                return [
-                    Entry(**entry_data)
-                    for entry_data in self.load_json_file(possible_config_file)
-                ]
+            entries = self.load_json_file(possible_config_file, [])
+            if entries:
+                return [Entry(**entry_data) for entry_data in entries]
 
         sys.exit(f"No config file found at {', '.join(possible_config_files)}")
 
     def get_last_run(self, name):
         "Returns the last run time for a command."
-        if not os.path.exists(self.last_run_path):
-            return None
-
-        last_run = self.load_json_file(self.last_run_path)
+        last_run = self.load_json_file(self.last_run_path, {})
         if name not in last_run:
             return None
 
@@ -88,11 +86,8 @@ class NagRunner:
 
     def set_last_run(self, entry):
         "Don't run the command this time and reset the interval."
-        last_run = {}
-        if os.path.exists(self.last_run_path):
-            last_run = self.load_json_file(self.last_run_path)
-        else:
-            os.makedirs(os.path.dirname(self.last_run_path), exist_ok=True)
+        os.makedirs(os.path.dirname(self.last_run_path), exist_ok=True)
+        last_run = self.load_json_file(self.last_run_path, {})
         last_run[entry.name] = datetime.now().isoformat()
         with open(self.last_run_path, "w", encoding="utf-8") as file:
             json.dump(last_run, file)
@@ -104,14 +99,14 @@ class NagRunner:
     def print_menu(self, _entry):
         "Show the help menu"
         print("Possible responses are:")
-        for responses, method in self.get_user_actions():
+        for responses, method, _ask_again in self.get_user_actions():
             print(f"{responses[0]}: {method.__doc__}")
 
     def get_user_actions(self):
         "Returns a list of actions the user can take."
         return [
             # (responses, method, ask_again)
-            (["y", "Y", ""], self.run_entry, False),
+            (["Y", "y", ""], self.run_entry, False),
             (["n", "N"], self.print_next_time_message, False),
             (["d"], self.set_last_run, False),
             (["?"], self.print_menu, True),
