@@ -47,8 +47,10 @@ passed.
 * `--name`, `-n`: Name of a single entry to run.
 * `--list`: List all entries and when they will next run. Will output something like this:
 ```
-archlinux updates: Next run in 6 days
-prune backups: Next run in 2 days
+archlinux updates: Next run in 7 days (Runs every 7 days, last run 0 days ago)
+prune yay cache: Next run in 21 days (Runs every 31 days, last run 10 days ago)
+prune backups: Next run in 32 days (Runs every 37 days, last run 5 days ago)
+backups: Next run in 8 days (Runs every 11 days, last run 3 days ago)
 ```
 
 ## Tips
