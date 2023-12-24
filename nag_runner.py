@@ -6,7 +6,7 @@ import json
 import os
 import sys
 from collections import namedtuple
-from datetime import datetime, timedelta
+from datetime import datetime
 from subprocess import call
 
 
@@ -47,13 +47,24 @@ class NagRunner:
 
         sys.exit(f"No config file found at {', '.join(possible_config_files)}")
 
-    def get_last_run(self, name):
-        "Returns the last run time for a command."
-        last_run = self.load_json_file(self.last_run_path, {})
-        if name not in last_run:
+    def get_days_since_last_run(self, entry):
+        "Returns the number of days since the command was last run."
+        last_run_dict = self.load_json_file(self.last_run_path, {})
+        if entry.name not in last_run_dict:
             return None
 
-        return datetime.strptime(last_run[name], "%Y-%m-%dT%H:%M:%S.%f")
+        last_run_time = datetime.strptime(
+            last_run_dict[entry.name], "%Y-%m-%dT%H:%M:%S.%f"
+        )
+        return (datetime.now() - last_run_time).days
+
+    def get_days_to_next_run(self, entry):
+        "Returns the number of days until the command should be run."
+        days_since = self.get_days_since_last_run(entry)
+        if days_since is None:
+            return 0
+
+        return int(entry.interval) - days_since
 
     def get_entry_by_name(self, name):
         "Returns the entry with the given name."
@@ -65,14 +76,15 @@ class NagRunner:
     def list_entries_next_run(self):
         "Lists all entries and when they will next run."
         for entry in self.config:
-            last_run = self.get_last_run(entry.name)
-            if last_run:
-                next_run = last_run + timedelta(days=int(entry.interval))
-                days_until_next_run = (next_run - datetime.now()).days
-            else:
-                days_until_next_run = 0
+            days_until_next_run = max(self.get_days_to_next_run(entry), 0)
+            days_since = self.get_days_since_last_run(entry)
+            runs_every_text = f"Runs every {entry.interval} days"
+            next_run_text = f"Next run in {days_until_next_run} days"
+            last_run_text = "never run before"
+            if days_since is not None:
+                last_run_text = f"last run {days_since} days ago"
 
-            print(f"{entry.name}: Next run in {days_until_next_run} days")
+            print(f"{entry.name}: {next_run_text} ({runs_every_text}, {last_run_text})")
 
     def run_entry(self, entry):
         "Runs the command and set it's last run date."
@@ -114,25 +126,28 @@ class NagRunner:
 
     def run_overdue_entries(self):
         "Runs all overdue entries."
+        actions = self.get_user_actions()
+        choice_letters = [responses[0] for responses, _, _ in actions]
+        run_now_text = f"Run now? [{'/'.join(choice_letters)}] "
+
         for entry in self.config:
-            last_run = self.get_last_run(entry.name)
-            if last_run:
-                delta = datetime.now() - last_run
-                if delta < timedelta(days=int(entry.interval)):
+            days_since = self.get_days_since_last_run(entry)
+            if days_since is not None:
+                if days_since < int(entry.interval):
                     continue
 
-                prompt = (
-                    f"It has been {delta.days} days since you last ran {entry.name}. "
-                    "Run now? [Y/n/d/?] "
+                days_since_text = (
+                    f"It has been {days_since} days since you last ran {entry.name}."
                 )
+                prompt = f"{days_since_text} {run_now_text}"
             else:
-                prompt = f"You have never run {entry.name}. Run now? [Y/n/d/?] "
+                prompt = f"You have never run {entry.name}. {run_now_text}"
 
             keep_going = True
             while keep_going:
                 print(prompt, end="")
                 response = input()
-                for responses, method, ask_again in self.get_user_actions():
+                for responses, method, ask_again in actions:
                     if response in responses:
                         method(entry)
                         keep_going = ask_again
