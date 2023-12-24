@@ -65,13 +65,6 @@ class NagRunner:
         days_since = self.get_days_since_last_run(entry)
         return 0 if days_since is None else int(entry.interval) - days_since
 
-    def get_entry_by_name(self, name):
-        "Returns the entry with the given name."
-        for entry in self.config:
-            if entry.name == name:
-                return entry
-        sys.exit(f"Could not find entry with name {name}")
-
     def get_entry_info(self, entry, show_extras):
         "gets the entry's name, when it will next run, and how often it runs."
         info = [entry.name]
@@ -88,7 +81,11 @@ class NagRunner:
 
     def run_entry_by_name(self, name):
         "Runs the entry with the given name."
-        self.run_entry(self.get_entry_by_name(name))
+        for entry in self.config:
+            if entry.name == name:
+                self.run_entry(entry)
+                return
+        sys.exit(f"Could not find entry with name {name}")
 
     def run_overdue_entries(self):
         "Runs all overdue entries."
