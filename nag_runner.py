@@ -61,10 +61,7 @@ class NagRunner:
     def get_days_to_next_run(self, entry):
         "Returns the number of days until the command should be run."
         days_since = self.get_days_since_last_run(entry)
-        if days_since is None:
-            return 0
-
-        return int(entry.interval) - days_since
+        return 0 if days_since is None else int(entry.interval) - days_since
 
     def get_entry_by_name(self, name):
         "Returns the entry with the given name."
@@ -76,15 +73,13 @@ class NagRunner:
     def list_entries_next_run(self):
         "Lists all entries and when they will next run."
         for entry in self.config:
-            days_until_next_run = max(self.get_days_to_next_run(entry), 0)
+            print(f"{entry.name}: Next run in ", end="")
+            print(f"{max(self.get_days_to_next_run(entry), 0)} days ", end="")
             days_since = self.get_days_since_last_run(entry)
-            runs_every_text = f"Runs every {entry.interval} days"
-            next_run_text = f"Next run in {days_until_next_run} days"
             last_run_text = "never run before"
             if days_since is not None:
                 last_run_text = f"last run {days_since} days ago"
-
-            print(f"{entry.name}: {next_run_text} ({runs_every_text}, {last_run_text})")
+            print(f"(Runs every {entry.interval} days, {last_run_text})")
 
     def run_entry(self, entry):
         "Runs the command and set it's last run date."
@@ -153,8 +148,7 @@ class NagRunner:
                         keep_going = ask_again
 
 
-def main():
-    "Main function."
+if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--config-path", "-c", help="Path to the config file")
     parser.add_argument("--last-run-path", "-l", help="Path to the last run file")
@@ -176,7 +170,3 @@ def main():
         nag_runner.list_entries_next_run()
     else:
         nag_runner.run_overdue_entries()
-
-
-if __name__ == "__main__":
-    main()
