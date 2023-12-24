@@ -72,16 +72,19 @@ class NagRunner:
                 return entry
         sys.exit(f"Could not find entry with name {name}")
 
-    def list_entries_next_run(self):
-        "Lists all entries and when they will next run."
-        for entry in self.config:
-            print(f"{entry.name}: Next run in ", end="")
-            print(f"{max(self.get_days_to_next_run(entry), 0)} days ", end="")
-            days_since = self.get_days_since_last_run(entry)
-            last_run_text = "never run before"
-            if days_since is not None:
-                last_run_text = f"last run {days_since} days ago"
-            print(f"(Runs every {entry.interval} days, {last_run_text})")
+    def get_entry_info(self, entry, show_extras):
+        "gets the entry's name, when it will next run, and how often it runs."
+        info = [entry.name]
+        days_since = self.get_days_since_last_run(entry)
+        if days_since is None:
+            info.append(" has never run before.")
+        else:
+            info.append(f" was last run {days_since} days ago.")
+        if show_extras:
+            info.append(" It runs next in ")
+            info.append(f"{max(self.get_days_to_next_run(entry), 0)} days.")
+            info.append(f" It runs every {entry.interval} days.")
+        return "".join(info)
 
     def run_entry_by_name(self, name):
         "Runs the entry with the given name."
@@ -90,16 +93,11 @@ class NagRunner:
     def run_overdue_entries(self):
         "Runs all overdue entries."
         for entry in self.config:
-            prompt = f"You have never run {entry.name}. Run now?"
             days_since = self.get_days_since_last_run(entry)
             if days_since is not None:
                 if days_since < int(entry.interval):
                     continue
-                prompt = (
-                    f"It has been {days_since} days since you last ran {entry.name}."
-                    " Run now?"
-                )
-            self.run_choice(prompt, entry)
+            self.run_choice(f"{self.get_entry_info(entry, False)} Run now?", entry)
 
     def run_entry(self, entry):
         "Y: Runs the command and set it's last run date."
@@ -159,6 +157,7 @@ if __name__ == "__main__":
     if args.name:
         nag_runner.run_entry_by_name(args.name)
     elif args.list:
-        nag_runner.list_entries_next_run()
+        for config_entry in nag_runner.config:
+            print(nag_runner.get_entry_info(config_entry, True))
     else:
         nag_runner.run_overdue_entries()
