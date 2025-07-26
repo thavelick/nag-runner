@@ -52,6 +52,13 @@ prune yay cache: Next run in 21 days (Runs every 31 days, last run 10 days ago)
 prune backups: Next run in 32 days (Runs every 37 days, last run 5 days ago)
 backups: Next run in 8 days (Runs every 11 days, last run 3 days ago)
 ```
+* `--check`: Check if there are any overdue entries. Exits with code 0 if no entries are overdue, or code 1 if entries need to be run. Useful for scripts:
+```bash
+if ! ./nag_runner.py --check; then
+    echo "Running overdue nags..."
+    ./nag_runner.py
+fi
+```
 
 ## Tips
 * If you'd like each different commands to run on different days, set each interval to a prime number of days. For instance if you set one command to run every 11 days and another every 13 days, they'll run with roughly the same regularity, but never on the same day.

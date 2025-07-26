@@ -87,6 +87,14 @@ class NagRunner:
                 return
         sys.exit(f"Could not find entry with name {name}")
 
+    def has_overdue_entries(self):
+        "Returns True if there are any overdue entries."
+        for entry in self.config:
+            days_since = self.get_days_since_last_run(entry)
+            if days_since is None or days_since >= int(entry.interval):
+                return True
+        return False
+
     def run_overdue_entries(self):
         "Runs all overdue entries."
         for entry in self.config:
@@ -148,6 +156,11 @@ if __name__ == "__main__":
         action="store_true",
         help="List all entries and when they will next run",
     )
+    group.add_argument(
+        "--check",
+        action="store_true",
+        help="Check if there are any overdue entries (exit 0 if none, 1 if any)",
+    )
     args = parser.parse_args()
 
     nag_runner = NagRunner(args.config_path, args.last_run_path)
@@ -156,5 +169,11 @@ if __name__ == "__main__":
     elif args.list:
         for config_entry in nag_runner.config:
             print(nag_runner.get_entry_info(config_entry, True))
+    elif args.check:
+        if nag_runner.has_overdue_entries():
+            print("Overdue entries found", file=sys.stderr)
+            sys.exit(1)
+        else:
+            sys.exit(0)
     else:
         nag_runner.run_overdue_entries()
