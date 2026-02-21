@@ -106,8 +106,11 @@ class NagRunner:
 
     def run_entry(self, entry):
         "Y: Runs the command and set it's last run date."
-        call(entry.command, shell=True)
-        self.set_last_run(entry)
+        return_code = call(entry.command, shell=True)
+        if return_code == 0:
+            self.set_last_run(entry)
+        else:
+            print(f"Command failed with exit code {return_code}. Not marking as done.")
 
     choice_1_run_entry = run_entry
 
